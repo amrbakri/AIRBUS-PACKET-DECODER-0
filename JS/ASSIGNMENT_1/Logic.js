@@ -15,9 +15,11 @@ function parseLiteralPackets(binary, i) {
 
   // fragile guard condition:  while (binary.length >= 7) {
   // solid guard condition(for input,e.g.: 0b111100): i + 5 <= binary.length
+  let decimalContentInPacketStartsAtBit = null;
   while (i + 5 <= binary.length) {
     console.log("in")
 
+    decimalContentInPacketStartsAtBit = i;
     const prefix = binary[i];
     valueBits += binary.slice(i + 1, i + 5);
     i += 5;
@@ -30,7 +32,8 @@ function parseLiteralPackets(binary, i) {
     version,
     packetTypeId,
     decimalContentInPacket: parseInt(valueBits, 2),
-    nextIndex: i
+    decimalContentInPacketStartsAtBit,
+    nextDecimalContentInPacketEndsAtBit: i
   };
 }
 
@@ -67,7 +70,7 @@ function parseOperatorPackets(binary, i) {
     while (i < end) {
       const packet = parsePacket(binary, i);
       subPackets.push(packet);
-      i = packet.nextIndex;
+      i = packet.nextDecimalContentInPacketEndsAtBit;
     }
   } else {
     // If the length type ID is 1, then the next 11 bits are a number that represents the number of sub-packets immediately contained by 
@@ -78,7 +81,7 @@ function parseOperatorPackets(binary, i) {
     for (let k = 0; k < numPackets; k++) {
       const packet = parsePacket(binary, i);
       subPackets.push(packet);
-      i = packet.nextIndex;
+      i = packet.nextDecimalContentInPacketEndsAtBit;
     }
   }
 
@@ -90,7 +93,7 @@ function parseOperatorPackets(binary, i) {
     subPacketsLen: subPackets.length,
     lengthTypeId,
     numOFBitsInSubPackets: totalLength,
-    nextIndex: i,
+    nextDecimalContentInPacketEndsAtBit: i,
   };
 }
 
@@ -201,7 +204,7 @@ function addVersionSum(packet) {
 // ----------------------------
 
 function detectBase(str) {
-  const clean = str.trim();
+  const clean = str.replace(/\s+/g, "").trim();
 
   let input = null;
 
@@ -218,7 +221,7 @@ function detectBase(str) {
   throw new Error("ambiguous input (Must use 0b or 0x as input-prefix");
 }
 
-const input = detectBase("0b111100")
+const input = detectBase("0x 9C0141080250320F1802104A08")
 const result = parsePacket(input);
   addVersionSum(result);// result object will be internally mutated "call by reference"
   
@@ -226,7 +229,8 @@ const result = parsePacket(input);
   console.log(JSON.stringify(result, null, 2));
   console.log("===== END ASSIGNMENT_1 =====")
 
+  console.log("\n")
 
-console.log("===== ASSIGNMENT_2 RESULT =====");
-console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
-console.log("===== END ASSIGNMENT_2 =====")
+  console.log("===== ASSIGNMENT_2 RESULT =====");
+  console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
+  console.log("===== END ASSIGNMENT_2 =====")
