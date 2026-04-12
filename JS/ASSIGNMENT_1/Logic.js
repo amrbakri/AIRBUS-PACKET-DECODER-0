@@ -131,9 +131,6 @@ function applyPacketOperator(packet) {
   let result;
   let operator;
 
-  // -------------------------
-  // OPERATORS
-  // -------------------------
   switch (packet.packetTypeId) {
     case 0:
       operator = "sum";
@@ -197,7 +194,7 @@ function addVersionSum(packet) {
 }
 
 // ----------------------------
-// RUN-LOGIC "input hexa-decimal here"
+// RUN-LOGIC "input hexa or binary here"
 // special-case inputs: 
 // 0x220D62004EF
 // 0b111100
@@ -221,7 +218,8 @@ function detectBase(str) {
   throw new Error("ambiguous input (Must use 0b or 0x as input-prefix");
 }
 
-const input = detectBase("0x 9C0141080250320F1802104A08")
+const input = detectBase("0b 100 111 0 000000001010000 01000 01000000000100 101000000110010000011110001100000000010000100000100101000001000")
+console.log('input:',input)
 const result = parsePacket(input);
   addVersionSum(result);// result object will be internally mutated "call by reference"
   
