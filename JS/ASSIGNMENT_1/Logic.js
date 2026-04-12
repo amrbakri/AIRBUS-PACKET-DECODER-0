@@ -32,8 +32,9 @@ function parseLiteralPackets(binary, i) {
     version,
     packetTypeId,
     decimalContentInPacket: parseInt(valueBits, 2),
+    binaryContentInPacket: valueBits,
     decimalContentInPacketStartsAtBit,
-    nextDecimalContentInPacketEndsAtBit: i
+    versionOfNextHeaderExistsAtBit: i
   };
 }
 
@@ -70,7 +71,7 @@ function parseOperatorPackets(binary, i) {
     while (i < end) {
       const packet = parsePacket(binary, i);
       subPackets.push(packet);
-      i = packet.nextDecimalContentInPacketEndsAtBit;
+      i = packet.versionOfNextHeaderExistsAtBit;
     }
   } else {
     // If the length type ID is 1, then the next 11 bits are a number that represents the number of sub-packets immediately contained by 
@@ -81,7 +82,7 @@ function parseOperatorPackets(binary, i) {
     for (let k = 0; k < numPackets; k++) {
       const packet = parsePacket(binary, i);
       subPackets.push(packet);
-      i = packet.nextDecimalContentInPacketEndsAtBit;
+      i = packet.versionOfNextHeaderExistsAtBit;
     }
   }
 
@@ -92,14 +93,14 @@ function parseOperatorPackets(binary, i) {
     subPackets,
     subPacketsLen: subPackets.length,
     lengthTypeId,
-    numOFBitsInSubPackets: totalLength,
-    nextDecimalContentInPacketEndsAtBit: i,
+    numOfBitsInSubPackets: totalLength,
+    versionOfNextHeaderExistsAtBit: i,
   };
 }
 
-// ----------------------------
+// -----------
 // main parser
-// ----------------------------
+// -----------
 function parsePacket(binary, i = 0) {
   const typeId = parseInt(binary.slice(i + 3, i + 6), 2);
 
@@ -124,9 +125,7 @@ function applyPacketOperator(packet) {
 
   // extract numeric values from children
   const values = evaluatedChildren.map(child =>
-    child.type === "literal"
-      ? child.value
-      : child.result
+    child.type === "literal" ? child.value : child.result
   );
   let result;
   let operator;
@@ -198,6 +197,21 @@ function addVersionSum(packet) {
 // special-case inputs: 
 // 0x220D62004EF
 // 0b111100
+
+// 101 000 0 000000001011011 001 000 1 00000000001 011 000 1 00000000101 111 100 1 0110 110 100 0 0110 101 100 0 1100 010 100 0 1111 010 100 0 1111 0000000
+// vvv ttt i         15      vvv ttt i      11     vvv ttt i     11      vvv ttt L   6  vvv ttt L  6   vvv ttt L  12  vvv ttt L  15  vvv ttt L  15                                                                                   
+
+// 110 000 0 000000001010100 000 000 0 000000000010110 000 100 0 1010 110 100 0 1011 100 000 1 00000000010 111 100 0 1100 000 100 0 1101 000000
+// vvv ttt i          15     vvv ttt i       15        vvv ttt L  10  vvv ttt L  11  vvv ttt i      11     vvv ttt L  12  vvv ttt L   13
+
+// 001 110 0 000000000011011 110 100 0 1010 010 100 0 0001 100 100        00000
+// vvv ttt i        15       vvv ttt L   10 vvv ttt L   1  vvv ttt
+
+// special case input:
+// 001 110 0 000000000011011 
+// 27 bits: 110 100 1 1010 0 1010 000 001 1 0010       0000000
+//          vvv ttt C  10  L  10  vvv ttt i            PADDING
+// vvv ttt i        15
 // ----------------------------
 
 function detectBase(str) {
@@ -218,17 +232,23 @@ function detectBase(str) {
   throw new Error("ambiguous input (Must use 0b or 0x as input-prefix");
 }
 
-const input = detectBase("0b 100 111 0 000000001010000 01000 01000000000100 101000000110010000011110001100000000010000100000100101000001000")
+const input = detectBase(
+  "0x 9C0141080250320F1802104A08"
+  // "0b  001 110 0 000000000011011 110 100 0 1010   0 1010 0 1 0001 001 000 0 00000"
+  // "0b  001 110 0 000000000011011   110 100 1 1010   0 1010   000 001 1 0010   0 000000"
+  //      001 110 0 000000000011011 | 110 100 1 1010 | 0 1010 | 000 001 1 0010 | 0 000000
+)
+
 console.log('input:',input)
 const result = parsePacket(input);
-  addVersionSum(result);// result object will be internally mutated "call by reference"
+addVersionSum(result);// result object will be internally mutated "call by reference"
   
-  console.log("===== ASSIGNMENT_1 RESULT =====");
-  console.log(JSON.stringify(result, null, 2));
-  console.log("===== END ASSIGNMENT_1 =====")
+console.log("===== ASSIGNMENT_1 RESULT =====");
+console.log(JSON.stringify(result, null, 2));
+console.log("===== END ASSIGNMENT_1 =====")
 
-  console.log("\n")
+console.log("\n")
 
-  console.log("===== ASSIGNMENT_2 RESULT =====");
-  console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
-  console.log("===== END ASSIGNMENT_2 =====")
+console.log("===== ASSIGNMENT_2 RESULT =====");
+console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
+console.log("===== END ASSIGNMENT_2 =====")
