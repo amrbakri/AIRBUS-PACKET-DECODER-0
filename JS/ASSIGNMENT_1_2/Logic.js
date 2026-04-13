@@ -1,3 +1,4 @@
+let decoder = "";
 function hexToBinary(hex) {
   return hex
     .split("")
@@ -8,8 +9,9 @@ function hexToBinary(hex) {
 function parseLiteralPackets(binary, i) {
   const version = parseInt(binary.slice(i, i + 3), 2);
   const packetTypeId = parseInt(binary.slice(i + 3, i + 6), 2);
+  decoder += "VVVTTT"
 
-  i += 6;//seek 6 places (from 0 to 5) "skip the three bits for packet version, and skip the three bits for packet literal value"
+  i += 6; //seek 6 places (from 0 to 5) "skip the three bits for packet version, and skip the three bits for packet literal value"
 
   let valueBits = "";
 
@@ -22,7 +24,16 @@ function parseLiteralPackets(binary, i) {
     valueBits += binary.slice(i + 1, i + 5);
     i += 5;
 
-    if (prefix === "0") break;
+    if (prefix === "1") {
+      decoder += "F"
+      decoder += "" + parseInt(valueBits, 2).toString().padStart(4, '0') + ""
+    }
+    else if (prefix === "0") {
+      decoder += "F";
+      decoder += "" + parseInt(valueBits, 2).toString().padStart(4, '0') + ""
+
+      break;
+    }
   }
 
   return {
@@ -32,21 +43,23 @@ function parseLiteralPackets(binary, i) {
     decimalContentInPacket: parseInt(valueBits, 2),
     binaryContentInPacket: valueBits,
     decimalContentInPacketStartsAtBit,
-    versionOfNextHeaderExistsAtBit: i
+    versionOfNextPacketExistsAtBit: i,
   };
 }
 
 // ----------------------------
-// operator packet
+// operator packets
 // ----------------------------
-function parseOperatorPackets(binary, i) {
-  const version = parseInt(binary.slice(i, i + 3), 2);
-  const packetTypeId = parseInt(binary.slice(i + 3, i + 6), 2);
+function parseOperatorPackets(binary, newPacketStartProcessingBit) {
+  const version = parseInt(binary.slice(newPacketStartProcessingBit, newPacketStartProcessingBit + 3), 2);
+  const packetTypeId = parseInt(binary.slice(newPacketStartProcessingBit + 3, newPacketStartProcessingBit + 6), 2);
 
-  i += 6;
+  const headerEndedAtBit = newPacketStartProcessingBit + 5;
+  decoder += "VVVTTT"
+  const bodyOfPacketStartAtBit = headerEndedAtBit + 1; //seek 6 places (from 0 to 5) "skip the three bits for packet version, and skip the three bits for packet literal value"
 
-  const lengthTypeId = binary[i];
-  i += 1;
+  const lengthTypeId = binary[bodyOfPacketStartAtBit];
+  let subPacketsExistAtBit = bodyOfPacketStartAtBit + 1;
 
   const subPackets = [];
 // An operator packet contains one or more packets. To indicate which subsequent binary data represents its sub-packets,
@@ -55,32 +68,37 @@ function parseOperatorPackets(binary, i) {
 
   let totalLength = null;
   if (lengthTypeId === "0") {
+    decoder += "i"
     // If the length type ID is 0, then the next 15 bits are a number that represents the total length in bits of the sub-packets 
     // contained by this packet.
     //totalLength = number of bits occupied by ALL sub-packets
     //i = 22   <- sub-packets start
     // totalLength = 27
-    // bits 22 → 49
-    totalLength = parseInt(binary.slice(i, i + 15), 2);//convert binary string to deciaml
-    i += 15;
+    // bits 22 -> 49
+    totalLength = parseInt(binary.slice(subPacketsExistAtBit, subPacketsExistAtBit + 15), 2);//convert binary string to deciaml
+    subPacketsExistAtBit += 15;
+    decoder += "<-----15------>";
 
-    const end = i + totalLength;
+    const end = subPacketsExistAtBit + totalLength;
 
-    while (i < end) {
-      const packet = parsePacket(binary, i);
+    while (subPacketsExistAtBit < end) {
+      const packet = parsePacket(binary, subPacketsExistAtBit);
       subPackets.push(packet);
-      i = packet.versionOfNextHeaderExistsAtBit;
+      subPacketsExistAtBit = packet.versionOfNextPacketExistsAtBit;
     }
   } else {
+    decoder += "i";
     // If the length type ID is 1, then the next 11 bits are a number that represents the number of sub-packets immediately contained by 
     // this packet.
-    const numPackets = parseInt(binary.slice(i, i + 11), 2);
-    i += 11;
+    const numPackets = parseInt(binary.slice(subPacketsExistAtBit, subPacketsExistAtBit + 11), 2);
+    subPacketsExistAtBit += 11;
+    decoder += "<---11---->";
+
 
     for (let k = 0; k < numPackets; k++) {
-      const packet = parsePacket(binary, i);
+      const packet = parsePacket(binary, subPacketsExistAtBit);
       subPackets.push(packet);
-      i = packet.versionOfNextHeaderExistsAtBit;
+      subPacketsExistAtBit = packet.versionOfNextPacketExistsAtBit;
     }
   }
 
@@ -88,17 +106,17 @@ function parseOperatorPackets(binary, i) {
     type: "operatorPacket",
     version,
     packetTypeId,
-    subPackets,
-    subPacketsLen: subPackets.length,
     lengthTypeId,
     numOfBitsInSubPackets: totalLength,
-    versionOfNextHeaderExistsAtBit: i,
+    versionOfNextPacketExistsAtBit: subPacketsExistAtBit,
+    subPacketsLen: subPackets.length,
+    subPackets,
   };
 }
 
-// -----------
+// ------------------
 // main parser
-// -----------
+// ----------------
 function parsePacket(binary, i = 0) {
   const typeId = parseInt(binary.slice(i + 3, i + 6), 2);
 
@@ -241,19 +259,51 @@ const input = detectBase(
   // "0b  001 110 0 000000000011011 110 100 0 1010   0 1010 0 1 0001 001 000 0 00000"
   // "0b  001 110 0 000000000011011   110 100 1 1010   0 1010   000 001 1 0010   0 000000"
   //      001 110 0 000000000011011 | 110 100 1 1010 | 0 1010 | 000 001 1 0010 | 0 000000
-  "0x0000000000"
+  // "0x0000000000"
   // "0x 04005AC33890"
+  // "0x A0016C880162017C3686B18A3D4780"
+  // "0x EE00D40C823060"
+
+  // "0b 11101110000000001101010000001100100000100011000001100000"
+  // input: 001 110 0 000000000011011 110 100 0 1010 010 100 1 0001 0 0100 0000000
+  // DECOD: vvv ttt i UUUUUUUUUUUUUUU vvv ttt L LLLL vvv ttt C CCCC L LLLL
+
+  // input: 111 011 1 00000000011 010 100 0 0001 100 100 0 0010 001 100 0 0011 00000
+  // DECOD: VVV TTT i <---11----> VVV TTT F LLLL VVV TTT F LLLL VVV TTT F LLLL
+
+  // input: 111 011 1 00000000011 010 100 0 0001 100 100 0 0010 001 100 0 0011 00000
+  // DECOD: VVV TTT i <---11----> VVV TTT F 0001 VVV TTT F 0002 VVV TTT F 0003
+
+  // "0b 00111000000000000110111101000101001010010001001000000000"
+// Raw-input: 001 110 0 000000000011011 110 100 0 1010 010 100 1 0001 0 0100 0000000
+// asDECODED: VVV TTT i <-----15------> VVV TTT F 0010 VVV TTT F 0001 F 0020
+
+
+//-----------------------------------------------------------
+// EDGE-CASES (can not be parsed)
+//-----------------------------------------------------------
+
+// "0b 001100000010010011000001010"
+"0b           001 100 0 0001 001 001 1 00000101000"
+// raw-input: 001 100 0 0001 001 001 1 00000101000
+// asDECODED: VVV TTT F 0001 VVV TTT F
+
 )
 
-console.log('input:',input)
 const result = parsePacket(input);
+console.log('Raw-input:',input);
+console.log('asDECODED:',decoder)
 console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
-console.log("===== ASSIGNMENT_1 DETAILS =====");
+console.log("Operator:",applyPacketOperator(result).operator);
+console.log("Operands:",applyPacketOperator(result).operands);
+console.log("Evaluation:",applyPacketOperator(result).result);
+
+console.log("\n" + "=".repeat(80));
+console.log("===== ASSIGNMENT_1 EXPLAIN. =====");
 console.log(JSON.stringify(result, null, 2));
 console.log("===== END Of ASSIGNMENT_1 =====")
 
-console.log("\n")
-
-console.log("===== ASSIGNMENT_2 DETAILS =====");
+console.log("\n" + "=".repeat(80));
+console.log("===== ASSIGNMENT_2 EXPLAIN. =====");
 console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
 console.log("===== END Of ASSIGNMENT_2 =====")
