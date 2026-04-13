@@ -297,7 +297,7 @@ const input = detectBase(
 // EDGE-CASES (can not be parsed)
 //-----------------------------------------------------------
 
-// "0b 001100000010010011000001010"
+"0b 001100000010010011000001010"
 // "0b           001 100 0 0001 001 001 1 00000101000"
 // raw-input: 001 100 0 0001 001 001 1 00000101000
 // asDECODED: VVV TTT F 0001 VVV TTT F
@@ -319,9 +319,9 @@ const input = detectBase(
 
 // const result = parsePacket(input);
 
-
 console.log('Raw-input:',input);
 
+// the following logimc is to handle the "EDGE-CASES (can not be parsed)" "0b 001100000010010011000001010"
 let i = 0;
 const packets = [];
 let result = undefined;
@@ -335,6 +335,7 @@ while (i + 6 <= input.length) {
   packets.push(result);
   i = result.versionOfNextPacketExistsAtBit;
 }
+
 console.log('asENCODED:',encoder)
 
 console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
