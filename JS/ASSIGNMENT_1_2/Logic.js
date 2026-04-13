@@ -114,6 +114,19 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
   };
 }
 
+function generateEncoding(packet) {
+  let encoding = "VVVTTT";
+  
+  if (packet.type === "literalPacket") {
+    return encoding + "F" + packet.decimalContentInPacket.toString(16).padStart(4, '0');
+  } else {
+    encoding += packet.lengthTypeId === "0" ? "i<-----15------>" : "i<---11---->";
+    for (const subPacket of packet.subPackets) {
+      encoding += generateEncoding(subPacket);
+    }
+    return encoding;
+  }
+}
 // ------------------
 // main parser
 // ----------------
@@ -278,21 +291,21 @@ const input = detectBase(
 // Raw-input: 001 110 0 000000000011011 110 100 0 1010 010 100 1 0001 0 0100 0000000
 // asDECODED: VVV TTT i <-----15------> VVV TTT F 0010 VVV TTT F 0001 F 0020
 
+// "0x 220D62004EF14266BBC5AB7A824C9C1802B360760094CE7601339D8347E20020264D0804CA95C33E006EA00085C678F31B80010B88319E1A1802D8010D4BC268927FF5EFE7B9C94D0C80281A00552549A7F12239C0892A04C99E1803D280F3819284A801B4CCDDAE6754FC6A7D2F89538510265A3097BDF0530057401394AEA2E33EC127EC3010060529A18B00467B7ABEE992B8DD2BA8D292537006276376799BCFBA4793CFF379D75CA1AA001B11DE6428402693BEBF3CC94A314A73B084A21739B98000010338D0A004CF4DCA4DEC80488F004C0010A83D1D2278803D1722F45F94F9F98029371ED7CFDE0084953B0AD7C633D2FF070C013B004663DA857C4523384F9F5F9495C280050B300660DC3B87040084C2088311C8010C84F1621F080513AC910676A651664698DF62EA401934B0E6003E3396B5BBCCC9921C18034200FC608E9094401C8891A234080330EE31C643004380296998F2DECA6CCC796F65224B5EBBD0003EF3D05A92CE6B1B2B18023E00BCABB4DA84BCC0480302D0056465612919584662F46F3004B401600042E1044D89C200CC4E8B916610B80252B6C2FCCE608860144E99CD244F3C44C983820040E59E654FA6A59A8498025234A471ED629B31D004A4792B54767EBDCD2272A014CC525D21835279FAD49934EDD45802F294ECDAE4BB586207D2C510C8802AC958DA84B400804E314E31080352AA938F13F24E9A8089804B24B53C872E0D24A92D7E0E2019C68061A901706A00720148C404CA08018A0051801000399B00D02A004000A8C402482801E200530058AC010BA8018C00694D4FA2640243CEA7D8028000844648D91A4001088950462BC2E600216607480522B00540010C84914E1E0002111F21143B9BFD6D9513005A4F9FC60AB40109CBB34E5D89C02C82F34413D59EA57279A42958B51006A13E8F60094EF81E66D0E737AE08"
 //---------------------------------------------------------------------------------
 //-----------------------------------------------------------
 // EDGE-CASES (can not be parsed)
 //-----------------------------------------------------------
 
-"0b 001100000010010011000001010"
+// "0b 001100000010010011000001010"
 // "0b           001 100 0 0001 001 001 1 00000101000"
 // raw-input: 001 100 0 0001 001 001 1 00000101000
 // asDECODED: VVV TTT F 0001 VVV TTT F
-
 )
 
 // let i = 0;
 // const packets = [];
-// // for:while (i + 6 <= input.length)-> to validate that there is at least 6 bits reserved for the header(version+type). parseLiteralPackets() slices based on existing header
+// // for:while (i + 6 <= input.length) -> to validate that there is at least 6 bits reserved for the header(version+type). parseLiteralPackets() slices based on existing header
 // // so, it must be checked for first.
 // while (i + 6 <= input.length) {
 //   // stop if remaining bits are zeros (the padding)
@@ -304,10 +317,26 @@ const input = detectBase(
 // }
 //---------------------------------------------------------------------------------
 
-const result = parsePacket(input);
+// const result = parsePacket(input);
+
 
 console.log('Raw-input:',input);
+
+let i = 0;
+const packets = [];
+let result = undefined;
+// for:while (i + 6 <= input.length) -> to validate that there is at least 6 bits reserved for the header(version+type). parseLiteralPackets() slices based on existing header
+// so, it must be checked for first.
+while (i + 6 <= input.length) {
+  // stop if remaining bits are zeros (the padding)
+  if (/^0+$/.test(input.slice(i))) break;
+
+  result = parsePacket(input, i);
+  packets.push(result);
+  i = result.versionOfNextPacketExistsAtBit;
+}
 console.log('asENCODED:',encoder)
+
 console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
 console.log("Operator:",applyPacketOperator(result).operator);
 console.log("Operands:",applyPacketOperator(result).operands);
