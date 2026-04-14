@@ -91,6 +91,88 @@ function sumAllVersions(packet) {
     return sum;
 }
 
+function applyPacketOperator(packet) {
+
+    // literalPackets do not contain operators
+    if (packet.type.typeName === "LiteralPacket") {
+      return {
+        type: "literal",
+        value: packet.literalGroupMsgDecimalRepr
+      };
+    }
+  
+    // evaluate children first
+    const evaluatedChildren = packet.subPackets.map(p => applyPacketOperator(p));
+  
+    // extract numeric values from children
+    const values = evaluatedChildren.map(child =>
+      child.type === "literal" ? child.value : child.result
+    );
+    
+    let result;
+    let operator;
+  
+    switch (packet.type.decimalRepr) {
+      case 0:
+        operator = "sum";
+        result = values.reduce((a, b) => a + b, 0);
+        break;
+  
+      case 1:
+        operator = "product";
+        result = values.reduce((a, b) => a * b, 1);
+        break;
+  
+      case 2:
+        operator = "min";
+        result = Math.min(...values);
+        break;
+  
+      case 3:
+        operator = "max";
+        result = Math.max(...values);
+        break;
+  
+      case 5:
+        if (values.length !== 2) {
+          throw new Error(`Operator 'greaterThan' expects exactly 2 operands, got ${values.length}`);
+        }
+        operator = "greaterThan";
+  
+        result = values[0] > values[1] ? 1 : 0;
+        break;
+  
+      case 6:
+        if (values.length !== 2) {
+          throw new Error(`Operator 'lessThan' expects exactly 2 operands, got ${values.length}`);
+        }
+        operator = "lessThan";
+  
+        result = values[0] < values[1] ? 1 : 0;
+        break;
+  
+      case 7:
+        if (values.length !== 2) {
+          throw new Error(`Operator 'equal' expects exactly 2 operands, got ${values.length}`);
+        }
+        operator = "equal";
+  
+        result = values[0] === values[1] ? 1 : 0;
+        break;
+  
+      default:
+        throw new Error("Unknown packetTypeId/OperatorId: " + packet.decimalRepr);
+    }
+  
+    return {
+      type: "operation",
+      operator,
+      operands: values,
+      result,
+      children: evaluatedChildren 
+    };
+  }
+
 function detectBase(str) {
     const clean = str.replace(/\s+/g, "").trim();
 
@@ -311,4 +393,10 @@ const result = parsePacket(input, 0, input.length);
 console.log(JSON.stringify(result, null, 2));
 
 console.log('sumAllVersions:', sumAllVersions(result));
+console.log("Operator:",applyPacketOperator(result).operator);
+console.log("Operands:",applyPacketOperator(result).operands);
+console.log("Evaluation:",applyPacketOperator(result).result);
+
+// console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
+
 
