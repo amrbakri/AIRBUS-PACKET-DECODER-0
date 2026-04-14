@@ -345,7 +345,7 @@ const input = detectBase(
 // EDGE-CASES (can not be parsed)
 //-----------------------------------------------------------
 
-"0b 001 100 0 0001 001 001 1 00000101000"
+"0b 001 100 0 0001 001 001 1 000001010"
     // 001 100 0 0001 001 001 1 00000101000
 // "0b           001 100 0 0001 001 001 1 00000101000"
 // raw-input: 001 100 0 0001 001 001 1 000001010
@@ -378,18 +378,18 @@ let result = undefined;
 // existing header, so, it must be checked for first.
 // raw-input: 001 100 0 0001 001 001 1 00000101000
 // asDECODED: VVV TTT F 0001 VVV TTT F
-// while (i + 6 <= input.length) {
-//   // stop if remaining bits are zeros (the padding)
-//   if (/^0+$/.test(input.slice(i))) break;
+while (i + 6 <= input.length) {
+  // stop if remaining bits are zeros (the padding)
+  if (/^0+$/.test(input.slice(i))) break;
 
-//   result = parsePacket(input, i);
-//   packets.push(result);
-//   i = result.versionOfNextPacketExistsAtBit;
-//   console.log('result:', JSON.stringify(result, null, 2))
-// }
+  result = parsePacket(input, i);
+  packets.push(result);
+  i = result.versionOfNextPacketExistsAtBit;
+  console.log('result:', JSON.stringify(result, null, 2))
+}
 
-result = parsePacket(input, i);
 console.log('asENCODED:',encoder)
+
 console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
 console.log("Operator:",applyPacketOperator(result).operator);
 console.log("Operands:",applyPacketOperator(result).operands);
