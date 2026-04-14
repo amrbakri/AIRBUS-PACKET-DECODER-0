@@ -68,10 +68,12 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
 
   const headerEndedAtBit = newPacketStartProcessingBit + 5;
   encoder += "VVVTTT"
-  const bodyOfPacketStartAtBit = headerEndedAtBit + 1; //seek 6 places (from 0 to 5) "skip the three bits for packet version, and skip the three bits for packet literal value"
+  const lengthTypeBitsContainerStartsAtBit = headerEndedAtBit + 1; //seek 6 places (from 0 to 5) "skip the three bits for packet version, and skip the three bits for packet literal value"
 
-  const lengthTypeId = binary[bodyOfPacketStartAtBit];
-  let subPacketsExistAtBit = bodyOfPacketStartAtBit + 1;
+  // lengthTypeBitsContainerStartsAtBit: [lengthTypeId <---11 bits--->]
+  const lengthTypeIdExistsAtBit = lengthTypeBitsContainerStartsAtBit;
+  const lengthTypeId = binary[lengthTypeBitsContainerStartsAtBit];
+  let subContentsTypeExistsAtBit = lengthTypeBitsContainerStartsAtBit + 1;
 
   const subPackets = [];
 // An operator packet contains one or more packets. To indicate which subsequent binary data represents its sub-packets,
@@ -79,7 +81,11 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
 // the length type ID:
 
   let totalLength = null;
+  let subContentsType = '';
+  let subContentsLengthInBits = null;
   if (lengthTypeId === "0") {
+    subContentsType = '15-Bits represents the total length in bits of the sub-packets';
+    subContentsLengthInBits = 15;
     encoder += "i"
     // If the length type ID is 0, then the next 15 bits are a number that represents the total length in bits of the sub-packets 
     // contained by this packet.
@@ -87,23 +93,26 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
     //i = 22   <- sub-packets start
     // totalLength = 27
     // bits 22 -> 49
-    totalLength = parseInt(binary.slice(subPacketsExistAtBit, subPacketsExistAtBit + 15), 2);//convert binary string to deciaml
-    subPacketsExistAtBit += 15;
+    totalLength = parseInt(binary.slice(subContentsTypeExistsAtBit, subContentsTypeExistsAtBit + 15), 2);//convert binary string to deciaml
+    subContentsTypeExistsAtBit += 15;
     encoder += "<-----15------>";
 
-    const end = subPacketsExistAtBit + totalLength;
+    const end = subContentsTypeExistsAtBit + totalLength;
 
-    while (subPacketsExistAtBit < end) {
-      const packet = parsePacket(binary, subPacketsExistAtBit);
+    while (subContentsTypeExistsAtBit < end) {
+      const packet = parsePacket(binary, subContentsTypeExistsAtBit);
       subPackets.push(packet);
-      subPacketsExistAtBit = packet.versionOfNextPacketExistsAtBit;
+      subContentsTypeExistsAtBit = packet.versionOfNextPacketExistsAtBit;
     }
   } else {
+    subContentsType = '11-Bits represents the number of sub-packets immediately contained in this packet.'
+    subContentsLengthInBits = 11;
+
     encoder += "i";
     // If the length type ID is 1, then the next 11 bits are a number that represents the number of sub-packets immediately contained by 
     // this packet.
-    const numPackets = parseInt(binary.slice(subPacketsExistAtBit, subPacketsExistAtBit + 11), 2);
-    subPacketsExistAtBit += 11;
+    const numPackets = parseInt(binary.slice(subContentsTypeExistsAtBit, subContentsTypeExistsAtBit + 11), 2);
+    subContentsTypeExistsAtBit += 11;
     encoder += "<---11---->";
 
     // bit 18: 1                                   
@@ -111,11 +120,9 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
     // asDECODED: VVV TTT F 0001 VVV TTT F | <---11--> vvv ttt f xxxxxxxxxx
 
     for (let k = 0; k < numPackets; k++) {
-      console.log('subindex:', subPacketsExistAtBit)
-
-      const packet = parsePacket(binary, subPacketsExistAtBit);
+      const packet = parsePacket(binary, subContentsTypeExistsAtBit);
       subPackets.push(packet);
-      subPacketsExistAtBit = packet.versionOfNextPacketExistsAtBit;
+      subContentsTypeExistsAtBit = packet.versionOfNextPacketExistsAtBit;
     }
   }
 
@@ -124,10 +131,18 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
     version,
     packetTypeId,
     lengthTypeId,
+    lengthTypeBitsContainerStartsAtBit,
+    lengthTypeIdExistsAtBit,
+    subContentsType,
     numOfBitsInSubPackets: totalLength,
-    versionOfNextPacketExistsAtBit: subPacketsExistAtBit,
+    versionOfNextPacketExistsAtBit: subContentsTypeExistsAtBit,
     subPacketsLen: subPackets.length,
     subPackets,
+    // debugging: {
+    //   formula: `versionOfNextPacketExistsAtBit = (lengthTypeIdExistsAtBit}(zero-based) + subContentsLengthInBits) + 1`,
+    //   lengthTypeIdExistsAtBit,
+    //   subContentsLengthInBits
+    // }
   };
 }
 
