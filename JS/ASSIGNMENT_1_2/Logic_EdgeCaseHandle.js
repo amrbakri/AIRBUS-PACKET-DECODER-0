@@ -76,10 +76,9 @@ function parseOperatorPackets(binary, newPacketStartProcessingBit) {
   let subContentsTypeExistsAtBit = lengthTypeBitsContainerStartsAtBit + 1;
 
   const subPackets = [];
-// An operator packet contains one or more packets. To indicate which subsequent binary data represents its sub-packets,
-// an operator packet can use one of two modes indicated by the bit immediately after the packet header; this is called 
-// the length type ID:
-
+  // An operator packet contains one or more packets. To indicate which subsequent binary data represents its sub-packets,
+  // an operator packet can use one of two modes indicated by the bit immediately after the packet header; this is called 
+  // the length type ID:
   let totalLength = null;
   let subContentsType = '';
   let subContentsLengthInBits = null;
@@ -386,22 +385,24 @@ while (i + 6 <= input.length) {
   packets.push(result);
   i = result.versionOfNextPacketExistsAtBit;
   console.log('result:', JSON.stringify(result, null, 2))
+
+  console.log('asENCODED:',encoder)
+
+  console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
+  console.log("Operator:",applyPacketOperator(result).operator);
+  console.log("Operands:",applyPacketOperator(result).operands);
+  console.log("Evaluation:",applyPacketOperator(result).result);
+
+  console.log("\n" + "=".repeat(80));
+  console.log("===== ASSIGNMENT_1 EXPLAIN. =====");
+  console.log(JSON.stringify(result, null, 2));
+  console.log("===== END Of ASSIGNMENT_1 =====")
+
+  console.log("\n" + "=".repeat(80));
+  console.log("===== ASSIGNMENT_2 EXPLAIN. =====");
+  console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
+  console.log("===== END Of ASSIGNMENT_2 =====")
 }
 
-console.log('asENCODED:',encoder)
 
-console.log('totalVersionSum:', addVersionSum(result));// result object will be internally mutated "call by reference"
-console.log("Operator:",applyPacketOperator(result).operator);
-console.log("Operands:",applyPacketOperator(result).operands);
-console.log("Evaluation:",applyPacketOperator(result).result);
-
-console.log("\n" + "=".repeat(80));
-console.log("===== ASSIGNMENT_1 EXPLAIN. =====");
-console.log(JSON.stringify(result, null, 2));
-console.log("===== END Of ASSIGNMENT_1 =====")
-
-console.log("\n" + "=".repeat(80));
-console.log("===== ASSIGNMENT_2 EXPLAIN. =====");
-console.log("OperatorsResults:", JSON.stringify(applyPacketOperator(result), null, 2));
-console.log("===== END Of ASSIGNMENT_2 =====")
 
